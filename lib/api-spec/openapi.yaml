@@ -1,0 +1,278 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Loon cover image proxy server API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: loon
+    description: Loon server management
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /loon/status:
+    get:
+      operationId: getLoonStatus
+      tags: [loon]
+      summary: Get loon server status
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoonStatus"
+
+  /loon/start:
+    post:
+      operationId: startLoon
+      tags: [loon]
+      summary: Start the loon server
+      responses:
+        "200":
+          description: Started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoonStatus"
+
+  /loon/stop:
+    post:
+      operationId: stopLoon
+      tags: [loon]
+      summary: Stop the loon server
+      responses:
+        "200":
+          description: Stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoonStatus"
+
+  /loon/images:
+    get:
+      operationId: getLoonImages
+      tags: [loon]
+      summary: Get image history
+      responses:
+        "200":
+          description: Image history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LoonImage"
+    delete:
+      operationId: clearLoonImages
+      tags: [loon]
+      summary: Clear image history
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClearResult"
+
+  /loon/config:
+    get:
+      operationId: getLoonConfig
+      tags: [loon]
+      summary: Get loon configuration
+      responses:
+        "200":
+          description: Config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoonConfig"
+    put:
+      operationId: updateLoonConfig
+      tags: [loon]
+      summary: Update loon configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoonConfigInput"
+      responses:
+        "200":
+          description: Updated config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoonConfig"
+
+  /loon/logs:
+    get:
+      operationId: getLoonLogs
+      tags: [loon]
+      summary: Get recent loon process logs
+      responses:
+        "200":
+          description: Recent log lines
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoonLogs"
+
+  /loon/metrics:
+    get:
+      operationId: getLoonMetrics
+      tags: [loon]
+      summary: Get real-time system and process metrics
+      responses:
+        "200":
+          description: System metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoonMetrics"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    LoonStatus:
+      type: object
+      properties:
+        running:
+          type: boolean
+        pid:
+          type: ["integer", "null"]
+        wsUrl:
+          type: string
+        frontendBaseUrl:
+          type: string
+        username:
+          type: string
+        uptime:
+          type: ["integer", "null"]
+      required:
+        - running
+        - wsUrl
+        - frontendBaseUrl
+        - username
+
+    LoonImage:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        contentType:
+          type: string
+        servedAt:
+          type: string
+        filename:
+          type: string
+        sizeBytes:
+          type: ["integer", "null"]
+      required:
+        - id
+        - url
+        - contentType
+        - servedAt
+        - filename
+
+    LoonConfig:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        maxContentSizeMb:
+          type: integer
+        cacheDurationSeconds:
+          type: integer
+      required:
+        - username
+        - password
+        - maxContentSizeMb
+        - cacheDurationSeconds
+
+    LoonConfigInput:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        maxContentSizeMb:
+          type: integer
+        cacheDurationSeconds:
+          type: integer
+
+    ClearResult:
+      type: object
+      properties:
+        cleared:
+          type: integer
+      required:
+        - cleared
+
+    LoonLogs:
+      type: object
+      properties:
+        lines:
+          type: array
+          items:
+            type: string
+      required:
+        - lines
+
+    LoonMetrics:
+      type: object
+      properties:
+        cpuUsagePercent:
+          type: number
+        memUsedBytes:
+          type: integer
+        memTotalBytes:
+          type: integer
+        diskUsedBytes:
+          type: integer
+        diskTotalBytes:
+          type: integer
+        imageStorageBytes:
+          type: integer
+        imageCount:
+          type: integer
+        nodeUptimeSeconds:
+          type: number
+      required:
+        - cpuUsagePercent
+        - memUsedBytes
+        - memTotalBytes
+        - diskUsedBytes
+        - diskTotalBytes
+        - imageStorageBytes
+        - imageCount
+        - nodeUptimeSeconds

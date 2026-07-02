@@ -1,0 +1,198 @@
+import { useGetLoonConfig, useUpdateLoonConfig, useGetLoonStatus, getGetLoonConfigQueryKey, getGetLoonStatusQueryKey } from "@workspace/api-client-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { Copy, Save } from "lucide-react";
+
+const configSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+  maxContentSizeMb: z.coerce.number().min(1, "Must be at least 1MB"),
+  cacheDurationSeconds: z.coerce.number().min(0, "Cannot be negative"),
+});
+
+type ConfigFormValues = z.infer<typeof configSchema>;
+
+export default function Settings() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: config } = useGetLoonConfig({ query: { queryKey: getGetLoonConfigQueryKey() } });
+  const { data: status } = useGetLoonStatus({ query: { queryKey: getGetLoonStatusQueryKey() } });
+
+  const updateMutation = useUpdateLoonConfig();
+
+  const form = useForm<ConfigFormValues>({
+    resolver: zodResolver(configSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+      maxContentSizeMb: 16,
+      cacheDurationSeconds: 30,
+    }
+  });
+
+  useEffect(() => {
+    if (config) {
+      form.reset({
+        username: config.username,
+        password: config.password,
+        maxContentSizeMb: config.maxContentSizeMb,
+        cacheDurationSeconds: config.cacheDurationSeconds,
+      });
+    }
+  }, [config, form]);
+
+  const onSubmit = (values: ConfigFormValues) => {
+    updateMutation.mutate({ data: values }, {
+      onSuccess: (data) => {
+        queryClient.invalidateQueries({ queryKey: getGetLoonConfigQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetLoonStatusQueryKey() });
+        const restarted = (data as Record<string, unknown>)?.restarted === true;
+        toast({
+          title: "Configuration saved",
+          description: restarted
+            ? "Settings applied — loon server restarted automatically."
+            : "Settings saved. Changes will apply on next start.",
+        });
+      },
+      onError: () => {
+        toast({ title: "Error", description: "Failed to update configuration.", variant: "destructive" });
+      }
+    });
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied", description: `${label} copied to clipboard.` });
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight mb-2">Settings</h2>
+        <p className="text-muted-foreground">Configure proxy behavior and get connection details for Music Presence.</p>
+      </div>
+
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle>Proxy Configuration</CardTitle>
+          <CardDescription>Server restarts automatically if needed when configuration changes.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Username</FormLabel>
+                      <FormControl>
+                        <Input className="bg-secondary/50 font-mono" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" className="bg-secondary/50 font-mono" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="maxContentSizeMb"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Max Content Size (MB)</FormLabel>
+                      <FormControl>
+                        <Input type="number" className="bg-secondary/50 font-mono" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cacheDurationSeconds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Cache Duration (Seconds)</FormLabel>
+                      <FormControl>
+                        <Input type="number" className="bg-secondary/50 font-mono" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <Button type="submit" className="font-mono uppercase tracking-widest" disabled={updateMutation.isPending}>
+                <Save className="w-4 h-4 mr-2" /> Save Changes
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-secondary/20 border-primary/20">
+        <CardHeader>
+          <CardTitle className="text-primary">Connection Details</CardTitle>
+          <CardDescription>Use these details to configure your Music Presence client.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label className="font-mono text-xs text-muted-foreground uppercase tracking-wider">WebSocket URL</Label>
+            <div className="flex gap-2">
+              <Input readOnly value={status?.wsUrl || "Loading..."} className="bg-background/50 font-mono text-primary" />
+              <Button variant="secondary" onClick={() => status?.wsUrl && copyToClipboard(status.wsUrl, "WebSocket URL")}>
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Frontend Base URL (For Discord)</Label>
+            <div className="flex gap-2">
+              <Input readOnly value={status?.frontendBaseUrl || "Loading..."} className="bg-background/50 font-mono" />
+              <Button variant="secondary" onClick={() => status?.frontendBaseUrl && copyToClipboard(status.frontendBaseUrl, "Frontend Base URL")}>
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="bg-background/50 p-4 rounded-md border border-border">
+            <h4 className="text-sm font-semibold mb-2">Music Presence Setup Instructions</h4>
+            <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1 ml-1">
+              <li>Open Music Presence Settings</li>
+              <li>Go to <strong>Discord &gt; Services</strong> and scroll to "Custom cover proxy server"</li>
+              <li>Paste the <strong>WebSocket URL</strong> above into the "Websocket URL" field</li>
+              <li>Paste the <strong>Frontend Base URL</strong> into "Frontend base URL"</li>
+              <li>Enter your username and password from the config above</li>
+              <li>Check <strong>"Disable TLS verification"</strong> if using a self-signed cert</li>
+              <li>Make sure the Loon server is <strong>RUNNING</strong> on the dashboard</li>
+              <li>Hit <strong>Save</strong> and check the status message</li>
+            </ol>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
