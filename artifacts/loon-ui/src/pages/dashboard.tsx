@@ -69,6 +69,47 @@ type ImageEntry = {
 
 type ImageDims = { w: number; h: number };
 
+/** Extract the most vibrant RGB color from an image via canvas sampling */
+function extractAccentColor(imgSrc: string): Promise<[number, number, number]> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const SIZE = 16;
+        canvas.width = SIZE;
+        canvas.height = SIZE;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve([0, 204, 204]); return; }
+        ctx.drawImage(img, 0, 0, SIZE, SIZE);
+        const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
+        let bestSaturation = 0;
+        let bestR = 0, bestG = 204, bestB = 204;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          // Skip near-black and near-white
+          if (max < 40 || min > 215) continue;
+          const saturation = max === 0 ? 0 : (max - min) / max;
+          const brightness = max / 255;
+          const score = saturation * 0.7 + brightness * 0.3;
+          if (score > bestSaturation) {
+            bestSaturation = score;
+            bestR = r; bestG = g; bestB = b;
+          }
+        }
+        resolve([bestR, bestG, bestB]);
+      } catch {
+        resolve([0, 204, 204]);
+      }
+    };
+    img.onerror = () => resolve([0, 204, 204]);
+    img.src = imgSrc;
+  });
+}
+
 function ImageLightbox({ image, onClose }: { image: ImageEntry | null; onClose: () => void }) {
   const [dims, setDims] = useState<ImageDims | null>(null);
 
@@ -93,7 +134,7 @@ function ImageLightbox({ image, onClose }: { image: ImageEntry | null; onClose: 
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-4 border-t border-border space-y-2">
+            <div className="p-4 border-t border-white/[0.06] space-y-2">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-1 min-w-0">
                   <p className="font-mono text-sm text-foreground truncate">{image.filename}</p>
@@ -104,7 +145,7 @@ function ImageLightbox({ image, onClose }: { image: ImageEntry | null; onClose: 
                     <span>{formatDistanceToNow(new Date(image.servedAt), { addSuffix: true })}</span>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => window.open(image.url, "_blank")} className="shrink-0">
+                <Button variant="outline" size="sm" onClick={() => window.open(image.url, "_blank")} className="shrink-0 bg-white/[0.05] border-white/[0.1]">
                   <ExternalLink className="w-4 h-4 mr-2" /> Open
                 </Button>
               </div>
@@ -159,7 +200,7 @@ function MetricsModal({ open, onClose }: { open: boolean; onClose: () => void })
             pct={diskPct}
             color={diskPct > 90 ? "bg-red-500" : diskPct > 70 ? "bg-yellow-500" : "bg-orange-500"}
           />
-          <div className="border-t border-border pt-4 grid grid-cols-2 gap-3 text-sm">
+          <div className="border-t border-white/[0.06] pt-4 grid grid-cols-2 gap-3 text-sm">
             <Stat label="Image Storage" value={formatBytes(metrics?.imageStorageBytes)} />
             <Stat label="Cached Images" value={`${metrics?.imageCount ?? 0}`} />
             <Stat label="Node.js Uptime" value={formatUptime(Math.round(metrics?.nodeUptimeSeconds ?? 0))} icon={<Clock className="w-3 h-3" />} />
@@ -177,7 +218,7 @@ function MetricRow({ icon, label, value, pct, color }: { icon: React.ReactNode; 
         <span className="flex items-center gap-1.5 text-muted-foreground">{icon}{label}</span>
         <span className="font-mono text-foreground">{value}</span>
       </div>
-      <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+      <div className="w-full h-2 bg-white/[0.05] rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
     </div>
@@ -186,7 +227,7 @@ function MetricRow({ icon, label, value, pct, color }: { icon: React.ReactNode; 
 
 function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
-    <div className="bg-secondary/40 rounded p-2.5 space-y-0.5">
+    <div className="bg-white/[0.04] rounded-lg p-2.5 space-y-0.5">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="font-mono text-sm font-medium flex items-center gap-1">{icon}{value}</p>
     </div>
@@ -200,12 +241,14 @@ export default function Dashboard() {
   const [lightboxImage, setLightboxImage] = useState<ImageEntry | null>(null);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [imageDims, setImageDims] = useState<Map<string, ImageDims>>(new Map());
+  const [accentRgb, setAccentRgb] = useState<[number, number, number]>([0, 204, 204]);
+  const lastAccentUrl = useRef<string>("");
 
   const { data: status } = useGetLoonStatus({
     query: { queryKey: getGetLoonStatusQueryKey(), refetchInterval: 2000, refetchIntervalInBackground: true }
   });
   const { data: images } = useGetLoonImages({
-    query: { queryKey: getGetLoonImagesQueryKey(), refetchInterval: 5000, refetchIntervalInBackground: true }
+    query: { queryKey: getGetLoonImagesQueryKey(), refetchInterval: 2000, refetchIntervalInBackground: true }
   });
   const { data: logs } = useGetLoonLogs({
     query: { queryKey: getGetLoonLogsQueryKey(), refetchInterval: 2000, refetchIntervalInBackground: true }
@@ -217,6 +260,16 @@ export default function Dashboard() {
   const startMutation = useStartLoon();
   const stopMutation = useStopLoon();
   const clearImagesMutation = useClearLoonImages();
+
+  // Extract accent color from most recent cover art
+  useEffect(() => {
+    const latestUrl = images?.[0]?.url;
+    if (!latestUrl || latestUrl === lastAccentUrl.current) return;
+    lastAccentUrl.current = latestUrl;
+    extractAccentColor(latestUrl).then(setAccentRgb);
+  }, [images]);
+
+  const accentCss = `${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}`;
 
   const logLines = useMemo(() => {
     const rawLines = logs?.lines ?? [];
@@ -285,6 +338,8 @@ export default function Dashboard() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetLoonImagesQueryKey() });
         setImageDims(new Map());
+        setAccentRgb([0, 204, 204]);
+        lastAccentUrl.current = "";
         toast({ title: "History cleared" });
       }
     });
@@ -296,17 +351,28 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
+    <div
+      className="space-y-6 animate-in fade-in duration-500"
+      style={{ "--accent-rgb": accentCss } as React.CSSProperties}
+    >
+      {/* Subtle accent glow behind the page */}
+      <div
+        className="pointer-events-none fixed inset-0 z-0 transition-all duration-[2000ms]"
+        style={{
+          background: `radial-gradient(ellipse 55% 35% at 70% 5%, rgba(${accentCss}, 0.07) 0%, transparent 70%)`,
+        }}
+      />
+
+      <div className="relative z-10 grid grid-cols-1 md:grid-cols-5 gap-5">
         {/* Status card */}
-        <Card className="col-span-1 md:col-span-2 glass-card border-0 shadow-lg">
+        <Card className="col-span-1 md:col-span-2 glass-card border-0 shadow-lg" style={{ boxShadow: `0 0 40px rgba(${accentCss}, 0.06)` }}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
                 Server Status
                 {status?.running ? (
-                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary mr-1.5 animate-pulse" /> RUNNING
+                  <Badge variant="outline" className="text-xs border-0" style={{ background: `rgba(${accentCss}, 0.12)`, color: `rgb(${accentCss})` }}>
+                    <span className="w-1.5 h-1.5 rounded-full mr-1.5 animate-pulse" style={{ background: `rgb(${accentCss})` }} /> RUNNING
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 text-xs">
@@ -322,7 +388,14 @@ export default function Dashboard() {
               <Button
                 size="lg"
                 variant={status?.running ? "destructive" : "default"}
-                className={`w-40 h-12 text-base font-mono tracking-widest uppercase transition-all ${status?.running ? "hover:bg-destructive/90 shadow-[0_0_28px_rgba(255,60,60,0.3)]" : "hover:bg-primary/90 shadow-[0_0_28px_rgba(0,204,204,0.25)]"}`}
+                className="w-40 h-12 text-base font-mono tracking-widest uppercase transition-all"
+                style={!status?.running ? {
+                  background: `rgba(${accentCss}, 0.9)`,
+                  color: "#000",
+                  boxShadow: `0 0 28px rgba(${accentCss}, 0.35)`,
+                } : {
+                  boxShadow: "0 0 28px rgba(255,60,60,0.3)",
+                }}
                 onClick={handleToggle}
                 disabled={startMutation.isPending || stopMutation.isPending}
               >
@@ -335,7 +408,9 @@ export default function Dashboard() {
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Users className="w-3.5 h-3.5" /> Connected
                 </div>
-                <p className={`text-2xl font-mono font-bold ${activeClients > 0 ? "text-primary drop-shadow-[0_0_8px_rgba(0,204,204,0.6)]" : "text-foreground"}`}>{activeClients}</p>
+                <p className="text-2xl font-mono font-bold transition-all duration-500" style={activeClients > 0 ? { color: `rgb(${accentCss})`, textShadow: `0 0 12px rgba(${accentCss}, 0.6)` } : {}}>
+                  {activeClients}
+                </p>
               </div>
               <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-1">
                 <div className="flex items-center justify-between">
@@ -364,7 +439,7 @@ export default function Dashboard() {
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider">WebSocket URL</label>
                 <div className="flex gap-2">
-                  <code className="flex-1 px-3 py-2 bg-black/30 text-primary/90 rounded-lg text-xs overflow-hidden text-ellipsis whitespace-nowrap border border-white/[0.08]">
+                  <code className="flex-1 px-3 py-2 bg-black/30 rounded-lg text-xs overflow-hidden text-ellipsis whitespace-nowrap border border-white/[0.08]" style={{ color: `rgb(${accentCss})` }}>
                     {status.wsUrl}
                   </code>
                   <Button variant="secondary" size="sm" onClick={() => copyToClipboard(status.wsUrl, "WebSocket URL")} className="bg-white/[0.06] hover:bg-white/[0.1] border-0">
@@ -381,7 +456,7 @@ export default function Dashboard() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               Terminal Logs
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: `rgb(${accentCss})` }} />
             </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 p-0">
@@ -413,7 +488,7 @@ export default function Dashboard() {
       </div>
 
       {/* Cover art section */}
-      <div className="space-y-4">
+      <div className="relative z-10 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold tracking-tight">Recent Cover Art</h2>
@@ -438,12 +513,17 @@ export default function Dashboard() {
 
         {images && images.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {images.map(image => {
+            {images.map((image, idx) => {
               const dims = imageDims.get(image.id);
+              const isNewest = idx === 0;
               return (
                 <div
                   key={image.id}
-                  className="overflow-hidden glass-card rounded-xl hover:border-primary/40 transition-all duration-200 group cursor-pointer hover:shadow-[0_0_20px_rgba(0,204,204,0.1)] hover:-translate-y-0.5"
+                  className="overflow-hidden glass-card rounded-xl transition-all duration-300 group cursor-pointer hover:-translate-y-0.5"
+                  style={isNewest ? {
+                    border: `1px solid rgba(${accentCss}, 0.4)`,
+                    boxShadow: `0 0 24px rgba(${accentCss}, 0.18)`,
+                  } : {}}
                   onClick={() => setLightboxImage(image as ImageEntry)}
                 >
                   <div className="aspect-square w-full bg-black/30 relative overflow-hidden">
@@ -451,15 +531,22 @@ export default function Dashboard() {
                       src={image.url}
                       alt={image.filename}
                       className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
+                      loading={idx < 10 ? "eager" : "lazy"}
                       onLoad={(e) => {
                         const el = e.currentTarget;
                         handleImageLoad(image.id, el.naturalWidth, el.naturalHeight);
                       }}
                     />
+                    {isNewest && (
+                      <div className="absolute top-2 left-2">
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ background: `rgba(${accentCss}, 0.85)`, color: "#000" }}>
+                          LATEST
+                        </span>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2.5 gap-0.5">
                       {image.sizeBytes != null && (
-                        <span className="text-xs text-primary font-mono font-bold leading-tight">{formatBytes(image.sizeBytes)}</span>
+                        <span className="text-xs font-mono font-bold leading-tight" style={{ color: `rgb(${accentCss})` }}>{formatBytes(image.sizeBytes)}</span>
                       )}
                       {dims && (
                         <span className="text-xs text-white/70 font-mono leading-tight">{dims.w} × {dims.h}</span>
@@ -476,7 +563,7 @@ export default function Dashboard() {
             })}
           </div>
         ) : (
-          <div className="glass-card rounded-xl border-dashed border border-white/[0.08]">
+          <div className="glass-card rounded-xl border border-white/[0.06]">
             <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground h-56">
               <div className="w-12 h-12 mb-4 rounded-full bg-white/[0.05] flex items-center justify-center">
                 <ImageIcon className="w-6 h-6 opacity-40" />

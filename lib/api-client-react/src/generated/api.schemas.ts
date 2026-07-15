@@ -35,6 +35,7 @@ export interface LoonConfig {
   password: string;
   maxContentSizeMb: number;
   cacheDurationSeconds: number;
+  maxStoredImages: number;
 }
 
 export interface LoonConfigInput {
@@ -42,6 +43,7 @@ export interface LoonConfigInput {
   password?: string;
   maxContentSizeMb?: number;
   cacheDurationSeconds?: number;
+  maxStoredImages?: number;
 }
 
 export interface ClearResult {
