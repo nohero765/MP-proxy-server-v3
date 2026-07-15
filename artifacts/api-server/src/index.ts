@@ -1,7 +1,7 @@
 import http from "http";
 import app, { wsProxy } from "./app";
 import { logger } from "./lib/logger";
-import { startLoon } from "./lib/loon-manager";
+import { startLoon, incrementConnectedClients, decrementConnectedClients } from "./lib/loon-manager";
 
 const rawPort = process.env["PORT"];
 
@@ -20,6 +20,10 @@ if (Number.isNaN(port) || port <= 0) {
 const server = http.createServer(app);
 
 server.on("upgrade", (req, socket, head) => {
+  if (req.url?.startsWith("/ws")) {
+    incrementConnectedClients();
+    socket.on("close", () => decrementConnectedClients());
+  }
   wsProxy.upgrade(req, socket, head);
 });
 

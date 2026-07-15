@@ -49,6 +49,11 @@ const defaultAppConfig: AppConfig = {
 let loonProcess: ChildProcess | null = null;
 let startedAt: Date | null = null;
 const logLines: string[] = [];
+let connectedClients = 0;
+
+export function getConnectedClients(): number { return connectedClients; }
+export function incrementConnectedClients(): void { connectedClients++; }
+export function decrementConnectedClients(): void { connectedClients = Math.max(0, connectedClients - 1); }
 
 export function getDataDir(): string {
   return DATA_DIR;
@@ -287,6 +292,7 @@ export function getStatus() {
     frontendBaseUrl: getFrontendBaseUrl(),
     username: readAppConfig().username,
     uptime: getUptime(),
+    connectedClients,
   };
 }
 
