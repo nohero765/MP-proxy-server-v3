@@ -76,7 +76,7 @@ function ImageLightbox({ image, onClose }: { image: ImageEntry | null; onClose: 
 
   return (
     <Dialog open={!!image} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden bg-black/95 border-border">
+      <DialogContent className="max-w-2xl p-0 overflow-hidden bg-black/80 backdrop-blur-xl border border-white/[0.08] shadow-2xl">
         {image && (
           <div className="flex flex-col">
             <div className="relative">
@@ -131,7 +131,7 @@ function MetricsModal({ open, onClose }: { open: boolean; onClose: () => void })
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg bg-card border-border">
+      <DialogContent className="max-w-lg glass-card border-0 shadow-2xl">
         <DialogHeader>
           <DialogTitle className="font-mono text-primary flex items-center gap-2">
             <Activity className="w-5 h-5" /> System Metrics
@@ -297,9 +297,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
         {/* Status card */}
-        <Card className="col-span-1 md:col-span-2 bg-card border-border shadow-sm">
+        <Card className="col-span-1 md:col-span-2 glass-card border-0 shadow-lg">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
@@ -318,11 +318,11 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
-            <div className="flex items-center justify-center py-5 bg-secondary/30 rounded-lg border border-border/50">
+            <div className="flex items-center justify-center py-5 bg-white/[0.03] rounded-xl border border-white/[0.06]">
               <Button
                 size="lg"
                 variant={status?.running ? "destructive" : "default"}
-                className={`w-40 h-12 text-base font-mono tracking-widest uppercase transition-all ${status?.running ? "hover:bg-destructive/90 shadow-[0_0_20px_rgba(255,0,0,0.25)]" : "hover:bg-primary/90 shadow-[0_0_20px_rgba(0,255,255,0.2)]"}`}
+                className={`w-40 h-12 text-base font-mono tracking-widest uppercase transition-all ${status?.running ? "hover:bg-destructive/90 shadow-[0_0_28px_rgba(255,60,60,0.3)]" : "hover:bg-primary/90 shadow-[0_0_28px_rgba(0,204,204,0.25)]"}`}
                 onClick={handleToggle}
                 disabled={startMutation.isPending || stopMutation.isPending}
               >
@@ -331,13 +331,13 @@ export default function Dashboard() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-secondary/40 rounded-lg p-3 border border-border/40 space-y-1">
+              <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-1">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Users className="w-3.5 h-3.5" /> Connected
                 </div>
-                <p className={`text-2xl font-mono font-bold ${activeClients > 0 ? "text-primary" : "text-foreground"}`}>{activeClients}</p>
+                <p className={`text-2xl font-mono font-bold ${activeClients > 0 ? "text-primary drop-shadow-[0_0_8px_rgba(0,204,204,0.6)]" : "text-foreground"}`}>{activeClients}</p>
               </div>
-              <div className="bg-secondary/40 rounded-lg p-3 border border-border/40 space-y-1">
+              <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Activity className="w-3.5 h-3.5" /> Server Load
@@ -353,7 +353,7 @@ export default function Dashboard() {
                 <p className={`text-2xl font-mono font-bold ${load.label === "HIGH" ? "text-red-400" : load.label === "MEDIUM" ? "text-yellow-400" : load.label === "LOW" ? "text-emerald-400" : "text-muted-foreground"}`}>
                   {load.label}
                 </p>
-                <div className="w-full h-1 bg-secondary rounded-full overflow-hidden">
+                <div className="w-full h-1 bg-white/[0.06] rounded-full overflow-hidden">
                   <div className={`h-full rounded-full transition-all duration-700 ${load.color}`} style={{ width: `${load.pct}%` }} />
                 </div>
                 <p className="text-xs font-mono text-muted-foreground/60">{cpuPct.toFixed(1)}% CPU</p>
@@ -364,10 +364,10 @@ export default function Dashboard() {
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider">WebSocket URL</label>
                 <div className="flex gap-2">
-                  <code className="flex-1 px-3 py-2 bg-secondary text-secondary-foreground rounded text-xs overflow-hidden text-ellipsis whitespace-nowrap border border-border">
+                  <code className="flex-1 px-3 py-2 bg-black/30 text-primary/90 rounded-lg text-xs overflow-hidden text-ellipsis whitespace-nowrap border border-white/[0.08]">
                     {status.wsUrl}
                   </code>
-                  <Button variant="secondary" size="sm" onClick={() => copyToClipboard(status.wsUrl, "WebSocket URL")}>
+                  <Button variant="secondary" size="sm" onClick={() => copyToClipboard(status.wsUrl, "WebSocket URL")} className="bg-white/[0.06] hover:bg-white/[0.1] border-0">
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -377,21 +377,24 @@ export default function Dashboard() {
         </Card>
 
         {/* Logs card */}
-        <Card className="col-span-1 md:col-span-3 bg-card border-border shadow-sm flex flex-col">
+        <Card className="col-span-1 md:col-span-3 glass-card border-0 shadow-lg flex flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium">Terminal Logs</CardTitle>
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              Terminal Logs
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 p-0">
             <div
               ref={logsViewportRef}
-              className="h-[380px] overflow-y-auto w-full bg-black/50 font-mono text-xs rounded-b-lg"
+              className="h-[360px] overflow-y-auto w-full bg-black/40 backdrop-blur-sm font-mono text-xs rounded-b-xl"
             >
               <div className="p-4 space-y-1.5">
                 {parsedLogs.length > 0 ? parsedLogs.map((entry, i) => {
                   if (!entry) return null;
                   const levelColor = entry.level === "ERROR" ? "text-red-400" : entry.level === "WARN" ? "text-yellow-400" : "text-primary/70";
                   return (
-                    <div key={i} className="flex gap-2 opacity-75 hover:opacity-100 transition-opacity leading-relaxed">
+                    <div key={i} className="flex gap-2 opacity-70 hover:opacity-100 transition-opacity leading-relaxed">
                       {entry.time && <span className="text-muted-foreground/40 shrink-0 tabular-nums">{entry.time}</span>}
                       <span className={`shrink-0 font-bold ${levelColor}`}>{entry.level}</span>
                       <span className="text-slate-300 break-all">
@@ -413,9 +416,9 @@ export default function Dashboard() {
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold tracking-tight">Recent Cover Art</h2>
+            <h2 className="text-xl font-bold tracking-tight">Recent Cover Art</h2>
             {images && images.length > 0 && (
-              <Badge variant="secondary" className="font-mono">{images.length}</Badge>
+              <Badge variant="secondary" className="font-mono bg-white/[0.06] border-0">{images.length}</Badge>
             )}
           </div>
           {images && images.length > 0 && (
@@ -426,7 +429,7 @@ export default function Dashboard() {
                   {formatBytes(totalStorageBytes)} stored
                 </span>
               )}
-              <Button variant="outline" size="sm" onClick={handleClearImages} disabled={clearImagesMutation.isPending}>
+              <Button variant="outline" size="sm" onClick={handleClearImages} disabled={clearImagesMutation.isPending} className="bg-white/[0.04] border-white/[0.1] hover:bg-white/[0.08]">
                 <Trash2 className="w-4 h-4 mr-2" /> Clear History
               </Button>
             </div>
@@ -438,12 +441,12 @@ export default function Dashboard() {
             {images.map(image => {
               const dims = imageDims.get(image.id);
               return (
-                <Card
+                <div
                   key={image.id}
-                  className="overflow-hidden bg-card border-border hover:border-primary/50 transition-colors group cursor-pointer"
+                  className="overflow-hidden glass-card rounded-xl hover:border-primary/40 transition-all duration-200 group cursor-pointer hover:shadow-[0_0_20px_rgba(0,204,204,0.1)] hover:-translate-y-0.5"
                   onClick={() => setLightboxImage(image as ImageEntry)}
                 >
-                  <div className="aspect-square w-full bg-secondary relative overflow-hidden">
+                  <div className="aspect-square w-full bg-black/30 relative overflow-hidden">
                     <img
                       src={image.url}
                       alt={image.filename}
@@ -468,20 +471,20 @@ export default function Dashboard() {
                       {formatDistanceToNow(new Date(image.servedAt), { addSuffix: true })}
                     </span>
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>
         ) : (
-          <Card className="border-dashed border-2 border-border bg-transparent">
-            <CardContent className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground h-64">
-              <div className="w-12 h-12 mb-4 rounded-full bg-secondary flex items-center justify-center">
-                <ImageIcon className="w-6 h-6 opacity-50" />
+          <div className="glass-card rounded-xl border-dashed border border-white/[0.08]">
+            <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground h-56">
+              <div className="w-12 h-12 mb-4 rounded-full bg-white/[0.05] flex items-center justify-center">
+                <ImageIcon className="w-6 h-6 opacity-40" />
               </div>
               <p className="font-medium text-foreground mb-1">No cover art yet</p>
-              <p className="text-sm max-w-md">Connect your Music Presence client to start seeing album art pass through the proxy.</p>
-            </CardContent>
-          </Card>
+              <p className="text-sm max-w-md opacity-70">Connect your Music Presence client to start seeing album art pass through the proxy.</p>
+            </div>
+          </div>
         )}
       </div>
 

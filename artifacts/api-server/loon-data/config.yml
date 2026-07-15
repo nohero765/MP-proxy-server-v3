@@ -1,5 +1,5 @@
 protocol:
-  base_url: https://21d2865f-2b14-4e64-86b7-e83d300b85a1-00-2ucc2h1c6kx9g.spock.replit.dev/loon-img
+  base_url: https://51b30bed-bcee-4a3b-9356-78d9e6ba4472-00-ki7nvsois7yd.worf.replit.dev/loon-img
   chunk_buffer_size: 8
   constraints:
     chunk_size: 65536

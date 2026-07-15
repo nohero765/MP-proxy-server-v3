@@ -82,7 +82,7 @@ export default function Settings() {
         <p className="text-muted-foreground">Configure proxy behavior and get connection details for Music Presence.</p>
       </div>
 
-      <Card className="bg-card border-border">
+      <Card className="glass-card border-0 shadow-lg">
         <CardHeader>
           <CardTitle>Proxy Configuration</CardTitle>
           <CardDescription>Server restarts automatically if needed when configuration changes.</CardDescription>
@@ -98,7 +98,7 @@ export default function Settings() {
                     <FormItem>
                       <FormLabel className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Username</FormLabel>
                       <FormControl>
-                        <Input className="bg-secondary/50 font-mono" {...field} />
+                        <Input className="bg-black/30 border-white/[0.08] font-mono" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -111,7 +111,7 @@ export default function Settings() {
                     <FormItem>
                       <FormLabel className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Password</FormLabel>
                       <FormControl>
-                        <Input type="password" className="bg-secondary/50 font-mono" {...field} />
+                        <Input type="password" className="bg-black/30 border-white/[0.08] font-mono" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -124,7 +124,7 @@ export default function Settings() {
                     <FormItem>
                       <FormLabel className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Max Content Size (MB)</FormLabel>
                       <FormControl>
-                        <Input type="number" className="bg-secondary/50 font-mono" {...field} />
+                        <Input type="number" className="bg-black/30 border-white/[0.08] font-mono" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -137,7 +137,7 @@ export default function Settings() {
                     <FormItem>
                       <FormLabel className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Cache Duration (Seconds)</FormLabel>
                       <FormControl>
-                        <Input type="number" className="bg-secondary/50 font-mono" {...field} />
+                        <Input type="number" className="bg-black/30 border-white/[0.08] font-mono" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -152,7 +152,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card className="bg-secondary/20 border-primary/20">
+      <Card className="glass-card border border-primary/15 shadow-[0_0_40px_rgba(0,204,204,0.06)]">
         <CardHeader>
           <CardTitle className="text-primary">Connection Details</CardTitle>
           <CardDescription>Use these details to configure your Music Presence client.</CardDescription>
@@ -161,8 +161,8 @@ export default function Settings() {
           <div className="space-y-2">
             <Label className="font-mono text-xs text-muted-foreground uppercase tracking-wider">WebSocket URL</Label>
             <div className="flex gap-2">
-              <Input readOnly value={status?.wsUrl || "Loading..."} className="bg-background/50 font-mono text-primary" />
-              <Button variant="secondary" onClick={() => status?.wsUrl && copyToClipboard(status.wsUrl, "WebSocket URL")}>
+              <Input readOnly value={status?.wsUrl || "Loading..."} className="bg-black/30 border-white/[0.08] font-mono text-primary" />
+              <Button variant="secondary" onClick={() => status?.wsUrl && copyToClipboard(status.wsUrl, "WebSocket URL")} className="bg-white/[0.06] hover:bg-white/[0.1] border-0">
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
@@ -171,14 +171,14 @@ export default function Settings() {
           <div className="space-y-2">
             <Label className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Frontend Base URL (For Discord)</Label>
             <div className="flex gap-2">
-              <Input readOnly value={status?.frontendBaseUrl || "Loading..."} className="bg-background/50 font-mono" />
-              <Button variant="secondary" onClick={() => status?.frontendBaseUrl && copyToClipboard(status.frontendBaseUrl, "Frontend Base URL")}>
+              <Input readOnly value={status?.frontendBaseUrl || "Loading..."} className="bg-black/30 border-white/[0.08] font-mono" />
+              <Button variant="secondary" onClick={() => status?.frontendBaseUrl && copyToClipboard(status.frontendBaseUrl, "Frontend Base URL")} className="bg-white/[0.06] hover:bg-white/[0.1] border-0">
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
           </div>
 
-          <div className="bg-background/50 p-4 rounded-md border border-border">
+          <div className="bg-black/20 p-4 rounded-xl border border-white/[0.06]">
             <h4 className="text-sm font-semibold mb-2">Music Presence Setup Instructions</h4>
             <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1 ml-1">
               <li>Open Music Presence Settings</li>
