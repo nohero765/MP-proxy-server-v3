@@ -173,11 +173,14 @@ components:
           type: string
         uptime:
           type: ["integer", "null"]
+        connectedClients:
+          type: integer
       required:
         - running
         - wsUrl
         - frontendBaseUrl
         - username
+        - connectedClients
 
     LoonImage:
       type: object

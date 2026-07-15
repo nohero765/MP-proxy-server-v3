@@ -18,6 +18,7 @@ export interface LoonStatus {
   username: string;
   /** @nullable */
   uptime?: number | null;
+  connectedClients: number;
 }
 
 export interface LoonImage {

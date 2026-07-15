@@ -26,7 +26,8 @@ export const GetLoonStatusResponse = zod.object({
   "wsUrl": zod.string(),
   "frontendBaseUrl": zod.string(),
   "username": zod.string(),
-  "uptime": zod.number().nullish()
+  "uptime": zod.number().nullish(),
+  "connectedClients": zod.number()
 })
 
 
@@ -39,7 +40,8 @@ export const StartLoonResponse = zod.object({
   "wsUrl": zod.string(),
   "frontendBaseUrl": zod.string(),
   "username": zod.string(),
-  "uptime": zod.number().nullish()
+  "uptime": zod.number().nullish(),
+  "connectedClients": zod.number()
 })
 
 
@@ -52,7 +54,8 @@ export const StopLoonResponse = zod.object({
   "wsUrl": zod.string(),
   "frontendBaseUrl": zod.string(),
   "username": zod.string(),
-  "uptime": zod.number().nullish()
+  "uptime": zod.number().nullish(),
+  "connectedClients": zod.number()
 })
 
 

@@ -52,15 +52,6 @@ function parseLogLine(raw: string): { time: string; level: string; msg: string; 
   }
 }
 
-function getActiveClients(logLines: string[]): number {
-  for (let i = logLines.length - 1; i >= 0; i--) {
-    try {
-      const obj = JSON.parse(logLines[i]);
-      if (obj.active_clients !== undefined) return Number(obj.active_clients);
-    } catch { /* not JSON */ }
-  }
-  return 0;
-}
 
 type ImageEntry = {
   id: string; url: string; filename: string;
@@ -291,7 +282,7 @@ export default function Dashboard() {
     return result;
   }, [logs?.lines]);
 
-  const activeClients = useMemo(() => getActiveClients(logLines), [logLines]);
+  const activeClients = status?.connectedClients ?? 0;
   const parsedLogs = useMemo(() => logLines.map(parseLogLine), [logLines]);
 
   const cpuPct = metrics?.cpuUsagePercent ?? 0;
