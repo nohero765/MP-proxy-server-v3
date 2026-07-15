@@ -4,7 +4,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { logger } from "./logger.js";
 import { db, imagesTable } from "@workspace/db";
-import { desc, sql } from "drizzle-orm";
+import { desc, sql, inArray } from "drizzle-orm";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +35,7 @@ interface AppConfig {
   password: string;
   maxContentSizeMb: number;
   cacheDurationSeconds: number;
+  maxStoredImages: number;
 }
 
 const defaultAppConfig: AppConfig = {
@@ -42,6 +43,7 @@ const defaultAppConfig: AppConfig = {
   password: "hiccup",
   maxContentSizeMb: 16,
   cacheDurationSeconds: 30,
+  maxStoredImages: 100,
 };
 
 let loonProcess: ChildProcess | null = null;
@@ -157,6 +159,8 @@ export async function recordImage(record: {
       filename: record.filename,
       sizeBytes: record.sizeBytes ?? null,
     });
+    // Run cleanup after each insert (non-blocking)
+    cleanupOldImages().catch((e) => logger.warn({ err: e }, "Post-insert cleanup failed"));
   } catch (e) {
     logger.warn({ err: e }, "Failed to persist image record to DB");
   }
@@ -185,6 +189,15 @@ export async function getImageHistory() {
 
 export async function clearImageHistory(): Promise<number> {
   try {
+    // Also delete all stored files
+    try {
+      const files = fs.readdirSync(IMG_STORE_DIR);
+      for (const file of files) {
+        fs.unlinkSync(path.join(IMG_STORE_DIR, file));
+      }
+    } catch (e) {
+      logger.warn({ err: e }, "Failed to clear img-store files");
+    }
     const result = await db
       .delete(imagesTable)
       .returning({ id: imagesTable.id });
@@ -192,6 +205,42 @@ export async function clearImageHistory(): Promise<number> {
   } catch (e) {
     logger.warn({ err: e }, "Failed to clear image history from DB");
     return 0;
+  }
+}
+
+export async function cleanupOldImages(): Promise<void> {
+  const config = readAppConfig();
+  const maxImages = config.maxStoredImages ?? 100;
+  try {
+    const allImages = await db
+      .select({ id: imagesTable.id, url: imagesTable.url })
+      .from(imagesTable)
+      .orderBy(desc(imagesTable.servedAt));
+
+    if (allImages.length <= maxImages) return;
+
+    const toDelete = allImages.slice(maxImages);
+    const idsToDelete = toDelete.map((img) => img.id);
+
+    // Delete DB records
+    await db.delete(imagesTable).where(inArray(imagesTable.id, idsToDelete));
+
+    // Delete files from disk
+    for (const img of toDelete) {
+      try {
+        const storageFilename = img.url.split("/").pop();
+        if (storageFilename) {
+          const filePath = path.join(IMG_STORE_DIR, storageFilename);
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
+      } catch (e) {
+        logger.warn({ err: e, url: img.url }, "Failed to delete image file");
+      }
+    }
+
+    logger.info({ deleted: toDelete.length, kept: maxImages }, "Cleaned up old images");
+  } catch (e) {
+    logger.warn({ err: e }, "Image cleanup failed");
   }
 }
 
@@ -322,3 +371,8 @@ export async function restartLoonIfRunning(): Promise<boolean> {
   await startLoon();
   return true;
 }
+
+// Periodic cleanup every 15 minutes
+setInterval(() => {
+  cleanupOldImages().catch((e) => logger.warn({ err: e }, "Periodic cleanup failed"));
+}, 15 * 60 * 1000);

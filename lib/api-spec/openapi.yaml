@@ -212,11 +212,14 @@ components:
           type: integer
         cacheDurationSeconds:
           type: integer
+        maxStoredImages:
+          type: integer
       required:
         - username
         - password
         - maxContentSizeMb
         - cacheDurationSeconds
+        - maxStoredImages
 
     LoonConfigInput:
       type: object
@@ -228,6 +231,8 @@ components:
         maxContentSizeMb:
           type: integer
         cacheDurationSeconds:
+          type: integer
+        maxStoredImages:
           type: integer
 
     ClearResult:

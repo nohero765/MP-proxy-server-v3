@@ -57,12 +57,13 @@ router.get("/loon/config", (_req, res) => {
 });
 
 router.put("/loon/config", async (req, res) => {
-  const { username, password, maxContentSizeMb, cacheDurationSeconds } = req.body as Record<string, unknown>;
+  const { username, password, maxContentSizeMb, cacheDurationSeconds, maxStoredImages } = req.body as Record<string, unknown>;
   const updated = writeAppConfig({
     ...(username !== undefined && { username: String(username) }),
     ...(password !== undefined && { password: String(password) }),
     ...(maxContentSizeMb !== undefined && { maxContentSizeMb: Number(maxContentSizeMb) }),
     ...(cacheDurationSeconds !== undefined && { cacheDurationSeconds: Number(cacheDurationSeconds) }),
+    ...(maxStoredImages !== undefined && { maxStoredImages: Number(maxStoredImages) }),
   });
   const restarted = await restartLoonIfRunning();
   res.json({ ...updated, restarted });
@@ -79,6 +80,8 @@ router.get("/loon/img-store/:filename", (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
+  // Files are content-addressed (random names) — cache aggressively
+  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
   res.sendFile(filePath);
 });
 

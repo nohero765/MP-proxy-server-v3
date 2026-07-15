@@ -11,4 +11,5 @@ export interface LoonConfigInput {
   password?: string;
   maxContentSizeMb?: number;
   cacheDurationSeconds?: number;
+  maxStoredImages?: number;
 }

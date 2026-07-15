@@ -85,7 +85,8 @@ export const GetLoonConfigResponse = zod.object({
   "username": zod.string(),
   "password": zod.string(),
   "maxContentSizeMb": zod.number(),
-  "cacheDurationSeconds": zod.number()
+  "cacheDurationSeconds": zod.number(),
+  "maxStoredImages": zod.number()
 })
 
 
@@ -96,14 +97,16 @@ export const UpdateLoonConfigBody = zod.object({
   "username": zod.string().optional(),
   "password": zod.string().optional(),
   "maxContentSizeMb": zod.number().optional(),
-  "cacheDurationSeconds": zod.number().optional()
+  "cacheDurationSeconds": zod.number().optional(),
+  "maxStoredImages": zod.number().optional()
 })
 
 export const UpdateLoonConfigResponse = zod.object({
   "username": zod.string(),
   "password": zod.string(),
   "maxContentSizeMb": zod.number(),
-  "cacheDurationSeconds": zod.number()
+  "cacheDurationSeconds": zod.number(),
+  "maxStoredImages": zod.number()
 })
 
 

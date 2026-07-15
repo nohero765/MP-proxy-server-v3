@@ -1,6 +1,7 @@
 import http from "http";
 import app, { wsProxy } from "./app";
 import { logger } from "./lib/logger";
+import { startLoon } from "./lib/loon-manager";
 
 const rawPort = process.env["PORT"];
 
@@ -28,4 +29,9 @@ server.listen(port, (err?: Error) => {
     process.exit(1);
   }
   logger.info({ port }, "Server listening");
+
+  // Auto-start loon proxy on boot
+  startLoon()
+    .then(() => logger.info("Loon auto-started on boot"))
+    .catch((e) => logger.warn({ err: e }, "Loon auto-start failed — start manually from dashboard"));
 });
