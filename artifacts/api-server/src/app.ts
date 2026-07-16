@@ -49,6 +49,50 @@ function getPublicUrl(storageFilename: string): string {
   return `${protocol}://${publicDomain}/api/loon/img-store/${storageFilename}`;
 }
 
+// Deduplicate streaming cover fetches: URL → timestamp last stored
+const streamingCoverCache = new Map<string, number>();
+const STREAMING_COVER_TTL_MS = 60 * 1000; // don't re-fetch the same URL within 60 s
+
+async function fetchAndStoreStreamingCover(cdnUrl: string): Promise<void> {
+  const now = Date.now();
+  const last = streamingCoverCache.get(cdnUrl);
+  if (last && now - last < STREAMING_COVER_TTL_MS) return;
+  streamingCoverCache.set(cdnUrl, now);
+
+  try {
+    const cdnRes = await fetch(cdnUrl, { signal: AbortSignal.timeout(10_000) });
+    const cdnContentType = cdnRes.headers.get("content-type") ?? "";
+    const isImg =
+      cdnContentType.includes("image/png") ||
+      cdnContentType.includes("image/jpeg") ||
+      cdnContentType.includes("image/gif") ||
+      cdnContentType.includes("image/webp");
+    if (!isImg || !cdnRes.ok) return;
+
+    const buffer = Buffer.from(await cdnRes.arrayBuffer());
+    const ext = cdnContentType.includes("png") ? "png"
+      : cdnContentType.includes("gif") ? "gif"
+      : cdnContentType.includes("webp") ? "webp"
+      : "jpg";
+    const storageFilename = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}.${ext}`;
+    const storagePath = path.join(IMG_STORE_DIR, storageFilename);
+
+    fs.writeFile(storagePath, buffer, (err) => {
+      if (err) logger.warn({ err }, "Failed to save streaming cover to disk");
+    });
+    recordImage({
+      url: getPublicUrl(storageFilename),
+      contentType: cdnContentType.split(";")[0]?.trim() ?? cdnContentType,
+      servedAt: new Date().toISOString(),
+      filename: cdnUrl.split("/").pop()?.split("?")[0] ?? "streaming-cover",
+      sizeBytes: buffer.length,
+    });
+    logger.info({ cdnUrl }, "Stored streaming cover art from CDN");
+  } catch (e) {
+    logger.warn({ err: e, cdnUrl }, "Failed to fetch streaming cover art from CDN");
+  }
+}
+
 const loonProxy = createProxyMiddleware({
   target: `http://localhost:${getLoonPort()}`,
   changeOrigin: true,
@@ -62,13 +106,15 @@ const loonProxy = createProxyMiddleware({
         contentType.includes("image/jpeg") ||
         contentType.includes("image/gif") ||
         contentType.includes("image/webp");
+      const isText = contentType.includes("text/plain");
 
       for (const [key, value] of Object.entries(proxyRes.headers)) {
         if (value != null) (res as Response).setHeader(key, value as string | string[]);
       }
       (res as Response).statusCode = proxyRes.statusCode ?? 200;
 
-      if (isImage && proxyRes.statusCode === 200) {
+      if (proxyRes.statusCode === 200 && (isImage || isText)) {
+        // Buffer the full body for both image and text/plain (CDN URL) responses
         const chunks: Buffer[] = [];
         try {
           for await (const chunk of proxyRes) {
@@ -78,33 +124,42 @@ const loonProxy = createProxyMiddleware({
           const code = (streamErr as NodeJS.ErrnoException).code;
           if (code === "ERR_STREAM_PREMATURE_CLOSE" || code === "ECONNRESET") {
             logger.warn({ code }, "Image stream closed early by client — skipping record");
-            if (!((res as Response).headersSent)) (res as Response).end();
+            if (!(res as Response).headersSent) (res as Response).end();
             return;
           }
           throw streamErr;
         }
         const buffer = Buffer.concat(chunks);
 
-        const url = req.url ?? "";
-        const originalFilename = url.split("/").pop()?.split("?")[0] ?? "image";
-        const ext = contentType.includes("png") ? "png"
-          : contentType.includes("gif") ? "gif"
-          : contentType.includes("webp") ? "webp"
-          : "jpg";
-        const storageFilename = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}.${ext}`;
-        const storagePath = path.join(IMG_STORE_DIR, storageFilename);
+        if (isImage) {
+          // Store proxied image directly
+          const url = req.url ?? "";
+          const originalFilename = url.split("/").pop()?.split("?")[0] ?? "image";
+          const ext = contentType.includes("png") ? "png"
+            : contentType.includes("gif") ? "gif"
+            : contentType.includes("webp") ? "webp"
+            : "jpg";
+          const storageFilename = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}.${ext}`;
+          const storagePath = path.join(IMG_STORE_DIR, storageFilename);
 
-        fs.writeFile(storagePath, buffer, (err) => {
-          if (err) logger.warn({ err }, "Failed to save image to local store");
-        });
-
-        recordImage({
-          url: getPublicUrl(storageFilename),
-          contentType: contentType.split(";")[0]?.trim() ?? contentType,
-          servedAt: new Date().toISOString(),
-          filename: originalFilename,
-          sizeBytes: buffer.length,
-        });
+          fs.writeFile(storagePath, buffer, (err) => {
+            if (err) logger.warn({ err }, "Failed to save image to local store");
+          });
+          recordImage({
+            url: getPublicUrl(storageFilename),
+            contentType: contentType.split(";")[0]?.trim() ?? contentType,
+            servedAt: new Date().toISOString(),
+            filename: originalFilename,
+            sizeBytes: buffer.length,
+          });
+        } else if (isText) {
+          // Loon sends CDN URLs as text/plain for streaming songs —
+          // fetch and store the actual image in the background
+          const text = buffer.toString("utf-8").trim();
+          if (text.startsWith("http://") || text.startsWith("https://")) {
+            fetchAndStoreStreamingCover(text).catch(() => {});
+          }
+        }
 
         (res as Response).end(buffer);
       } else {
