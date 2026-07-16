@@ -252,12 +252,19 @@ export default function Dashboard() {
   const stopMutation = useStopLoon();
   const clearImagesMutation = useClearLoonImages();
 
-  // Extract accent color from most recent cover art
+  // Extract accent color from most recent cover art and apply globally
   useEffect(() => {
     const latestUrl = images?.[0]?.url;
     if (!latestUrl || latestUrl === lastAccentUrl.current) return;
     lastAccentUrl.current = latestUrl;
-    extractAccentColor(latestUrl).then(setAccentRgb);
+    extractAccentColor(latestUrl).then((rgb) => {
+      setAccentRgb(rgb);
+      // Set on :root so the sidebar, glow animations, and layout all pick it up
+      document.documentElement.style.setProperty(
+        "--accent-rgb",
+        `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`,
+      );
+    });
   }, [images]);
 
   const accentCss = `${accentRgb[0]}, ${accentRgb[1]}, ${accentRgb[2]}`;
@@ -331,6 +338,7 @@ export default function Dashboard() {
         setImageDims(new Map());
         setAccentRgb([0, 204, 204]);
         lastAccentUrl.current = "";
+        document.documentElement.style.setProperty("--accent-rgb", "0, 204, 204");
         toast({ title: "History cleared" });
       }
     });

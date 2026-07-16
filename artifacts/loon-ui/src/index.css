@@ -41,6 +41,7 @@
 }
 
 :root, .dark {
+  --accent-rgb: 0, 204, 204; /* default cyan — updated dynamically from cover art */
   --background: 240 10% 3%;
   --foreground: 210 20% 98%;
 
@@ -113,10 +114,10 @@
   border-right: 1px solid hsl(240 10% 18% / 0.7);
 }
 
-/* Glow pulse on primary dot */
+/* Glow pulse — uses dynamic accent color */
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 6px 1px hsl(180 100% 40% / 0.6); }
-  50% { box-shadow: 0 0 14px 4px hsl(180 100% 40% / 0.9); }
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(var(--accent-rgb, 0, 204, 204), 0.6); }
+  50%       { box-shadow: 0 0 14px 4px rgba(var(--accent-rgb, 0, 204, 204), 0.9); }
 }
 .animate-glow-pulse {
   animation: glow-pulse 2s ease-in-out infinite;

@@ -3,6 +3,7 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import pinoHttp from "pino-http";
+import session from "express-session";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { createProxyMiddleware } from "http-proxy-middleware";
@@ -23,9 +24,22 @@ app.use(
     },
   }),
 );
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(
+  session({
+    secret: process.env["SESSION_SECRET"] ?? "dev-secret-change-me",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: false, // proxied via Replit; TLS is terminated upstream
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    },
+  }),
+);
 
 app.use("/api", router);
 
