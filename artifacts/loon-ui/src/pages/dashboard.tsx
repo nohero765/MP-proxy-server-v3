@@ -232,6 +232,7 @@ export default function Dashboard() {
   const [lightboxImage, setLightboxImage] = useState<ImageEntry | null>(null);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [imageDims, setImageDims] = useState<Map<string, ImageDims>>(new Map());
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
   const [accentRgb, setAccentRgb] = useState<[number, number, number]>([0, 204, 204]);
   const lastAccentUrl = useRef<string>("");
 
@@ -315,6 +316,15 @@ export default function Dashboard() {
       if (prev.get(id)?.w === w && prev.get(id)?.h === h) return prev;
       const next = new Map(prev);
       next.set(id, { w, h });
+      return next;
+    });
+  }, []);
+
+  const handleImageError = useCallback((id: string) => {
+    setBrokenImages(prev => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
       return next;
     });
   }, []);
