@@ -536,16 +536,24 @@ export default function Dashboard() {
                   onClick={() => setLightboxImage(image as ImageEntry)}
                 >
                   <div className="aspect-square w-full bg-black/30 relative overflow-hidden">
-                    <img
-                      src={image.url}
-                      alt={image.filename}
-                      className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-                      loading={idx < 10 ? "eager" : "lazy"}
-                      onLoad={(e) => {
-                        const el = e.currentTarget;
-                        handleImageLoad(image.id, el.naturalWidth, el.naturalHeight);
-                      }}
-                    />
+                    {brokenImages.has(image.id) ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/50 bg-black/20">
+                        <ImageIcon className="w-8 h-8 opacity-50" />
+                        <span className="text-[10px] font-mono uppercase tracking-wider">Image unavailable</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={image.url}
+                        alt=""
+                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+                        loading={idx < 10 ? "eager" : "lazy"}
+                        onLoad={(e) => {
+                          const el = e.currentTarget;
+                          handleImageLoad(image.id, el.naturalWidth, el.naturalHeight);
+                        }}
+                        onError={() => handleImageError(image.id)}
+                      />
+                    )}
                     {isNewest && (
                       <div className="absolute top-2 left-2">
                         <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ background: `rgba(${accentCss}, 0.85)`, color: "#000" }}>
