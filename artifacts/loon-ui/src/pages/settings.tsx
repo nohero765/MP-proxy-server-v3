@@ -59,7 +59,7 @@ export default function Settings() {
       onSuccess: (data) => {
         queryClient.invalidateQueries({ queryKey: getGetLoonConfigQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetLoonStatusQueryKey() });
-        const restarted = (data as Record<string, unknown>)?.restarted === true;
+        const restarted = (data as unknown as Record<string, unknown>)?.restarted === true;
         toast({
           title: "Configuration saved",
           description: restarted

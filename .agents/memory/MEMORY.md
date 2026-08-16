@@ -1,1 +1,2 @@
 - [Loon binary build](loon-binary-static-linking.md) — Go required to build; no prebuilt releases; install go-1.25 module; non-fatal in build.mjs, lazy in ensureBinary()
+- [Proxy safety boundary](proxy-safety-boundary.md) — keep public relay behavior narrow and validate external cover-art fetches

@@ -1,4 +1,5 @@
 import http from "http";
+import type { Socket } from "net";
 import app, { wsProxy } from "./app";
 import { logger } from "./lib/logger";
 import { startLoon, incrementConnectedClients, decrementConnectedClients } from "./lib/loon-manager";
@@ -24,7 +25,7 @@ server.on("upgrade", (req, socket, head) => {
     incrementConnectedClients();
     socket.on("close", () => decrementConnectedClients());
   }
-  wsProxy.upgrade(req, socket, head);
+  wsProxy.upgrade(req, socket as Socket, head);
 });
 
 server.listen(port, (err?: Error) => {

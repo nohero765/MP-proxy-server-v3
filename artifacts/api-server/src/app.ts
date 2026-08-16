@@ -2,6 +2,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import cors from "cors";
 import path from "path";
 import fs from "fs";
+import net from "net";
 import pinoHttp from "pino-http";
 import session from "express-session";
 import router from "./routes/index.js";
@@ -52,8 +53,54 @@ function getPublicUrl(storageFilename: string): string {
 // Deduplicate streaming cover fetches: URL → timestamp last stored
 const streamingCoverCache = new Map<string, number>();
 const STREAMING_COVER_TTL_MS = 60 * 1000; // don't re-fetch the same URL within 60 s
+const MAX_STREAMING_COVER_BYTES = 10 * 1024 * 1024;
+
+function isSafeStreamingCoverUrl(rawUrl: string): boolean {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    if (url.username || url.password) return false;
+
+    const hostname = url.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname === "localhost.localdomain" ||
+      hostname.endsWith(".localhost") ||
+      hostname === "metadata.google.internal" ||
+      hostname === "169.254.169.254"
+    ) return false;
+
+    // Reject private/link-local literal IPs. Hostname DNS rebinding is still
+    // handled by the platform network boundary, but obvious internal targets
+    // should never be fetched from a cover-art response.
+    const ipVersion = net.isIP(hostname);
+    if (ipVersion === 4) {
+      const octets = hostname.split(".").map(Number);
+      const [a, b] = octets;
+      if (
+        a === 10 ||
+        a === 127 ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168)
+      ) return false;
+    }
+    if (ipVersion === 6 && (hostname === "::1" || hostname.startsWith("fc") || hostname.startsWith("fd") || hostname.startsWith("fe80:"))) {
+      return false;
+    }
+
+    return rawUrl.length <= 4096;
+  } catch {
+    return false;
+  }
+}
 
 async function fetchAndStoreStreamingCover(cdnUrl: string): Promise<void> {
+  if (!isSafeStreamingCoverUrl(cdnUrl)) {
+    logger.warn({ cdnUrl }, "Rejected unsafe streaming cover URL");
+    return;
+  }
+
   const now = Date.now();
   const last = streamingCoverCache.get(cdnUrl);
   if (last && now - last < STREAMING_COVER_TTL_MS) return;
@@ -68,8 +115,17 @@ async function fetchAndStoreStreamingCover(cdnUrl: string): Promise<void> {
       cdnContentType.includes("image/gif") ||
       cdnContentType.includes("image/webp");
     if (!isImg || !cdnRes.ok) return;
+    const contentLength = Number(cdnRes.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_STREAMING_COVER_BYTES) {
+      logger.warn({ cdnUrl, contentLength }, "Rejected oversized streaming cover");
+      return;
+    }
 
     const buffer = Buffer.from(await cdnRes.arrayBuffer());
+    if (buffer.length > MAX_STREAMING_COVER_BYTES) {
+      logger.warn({ cdnUrl, sizeBytes: buffer.length }, "Rejected oversized streaming cover");
+      return;
+    }
     const ext = cdnContentType.includes("png") ? "png"
       : cdnContentType.includes("gif") ? "gif"
       : cdnContentType.includes("webp") ? "webp"
