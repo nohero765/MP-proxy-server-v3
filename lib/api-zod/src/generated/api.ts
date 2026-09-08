@@ -122,6 +122,19 @@ export const GetLoonLogsResponse = zod.object({
 
 
 /**
+ * @summary Get recent dashboard activity
+ */
+export const GetLoonActivityResponseItem = zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['server', 'client', 'image', 'config', 'security']),
+  "message": zod.string(),
+  "detail": zod.string().optional(),
+  "createdAt": zod.string()
+})
+export const GetLoonActivityResponse = zod.array(GetLoonActivityResponseItem)
+
+
+/**
  * @summary Get real-time system and process metrics
  */
 export const GetLoonMetricsResponse = zod.object({
@@ -132,7 +145,14 @@ export const GetLoonMetricsResponse = zod.object({
   "diskTotalBytes": zod.number(),
   "imageStorageBytes": zod.number(),
   "imageCount": zod.number(),
-  "nodeUptimeSeconds": zod.number()
+  "nodeUptimeSeconds": zod.number(),
+  "trafficRequests": zod.number(),
+  "trafficBytes": zod.number(),
+  "trafficImages": zod.number(),
+  "rateLimitedRequests": zod.number(),
+  "currentWindowRequests": zod.number(),
+  "rateLimitPerMinute": zod.number(),
+  "lastTrafficAt": zod.string().nullable()
 })
 
 

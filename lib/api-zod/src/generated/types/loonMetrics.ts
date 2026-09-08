@@ -15,4 +15,12 @@ export interface LoonMetrics {
   imageStorageBytes: number;
   imageCount: number;
   nodeUptimeSeconds: number;
+  trafficRequests: number;
+  trafficBytes: number;
+  trafficImages: number;
+  rateLimitedRequests: number;
+  currentWindowRequests: number;
+  rateLimitPerMinute: number;
+  /** @nullable */
+  lastTrafficAt: string | null;
 }

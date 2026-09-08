@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ActivityEvent,
   ClearResult,
   HealthStatus,
   LoonConfig,
@@ -711,6 +712,83 @@ export function useGetLoonLogs<TData = Awaited<ReturnType<typeof getLoonLogs>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetLoonLogsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetLoonActivityUrl = () => {
+
+
+
+
+  return `/api/loon/activity`
+}
+
+/**
+ * @summary Get recent dashboard activity
+ */
+export const getLoonActivity = async ( options?: RequestInit): Promise<ActivityEvent[]> => {
+
+  return customFetch<ActivityEvent[]>(getGetLoonActivityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLoonActivityQueryKey = () => {
+    return [
+    `/api/loon/activity`
+    ] as const;
+    }
+
+
+export const getGetLoonActivityQueryOptions = <TData = Awaited<ReturnType<typeof getLoonActivity>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLoonActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLoonActivityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLoonActivity>>> = ({ signal }) => getLoonActivity({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLoonActivity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLoonActivityQueryResult = NonNullable<Awaited<ReturnType<typeof getLoonActivity>>>
+export type GetLoonActivityQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get recent dashboard activity
+ */
+
+export function useGetLoonActivity<TData = Awaited<ReturnType<typeof getLoonActivity>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLoonActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLoonActivityQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

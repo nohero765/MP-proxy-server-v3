@@ -135,6 +135,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/LoonLogs"
 
+  /loon/activity:
+    get:
+      operationId: getLoonActivity
+      tags: [loon]
+      summary: Get recent dashboard activity
+      responses:
+        "200":
+          description: Recent activity events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEvent"
+
   /loon/metrics:
     get:
       operationId: getLoonMetrics
@@ -256,6 +271,26 @@ components:
       required:
         - lines
 
+    ActivityEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [server, client, image, config, security]
+        message:
+          type: string
+        detail:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - type
+        - message
+        - createdAt
+
     LoonMetrics:
       type: object
       properties:
@@ -275,6 +310,20 @@ components:
           type: integer
         nodeUptimeSeconds:
           type: number
+        trafficRequests:
+          type: integer
+        trafficBytes:
+          type: integer
+        trafficImages:
+          type: integer
+        rateLimitedRequests:
+          type: integer
+        currentWindowRequests:
+          type: integer
+        rateLimitPerMinute:
+          type: integer
+        lastTrafficAt:
+          type: ["string", "null"]
       required:
         - cpuUsagePercent
         - memUsedBytes
@@ -284,3 +333,10 @@ components:
         - imageStorageBytes
         - imageCount
         - nodeUptimeSeconds
+        - trafficRequests
+        - trafficBytes
+        - trafficImages
+        - rateLimitedRequests
+        - currentWindowRequests
+        - rateLimitPerMinute
+        - lastTrafficAt

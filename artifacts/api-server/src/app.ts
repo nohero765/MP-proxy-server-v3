@@ -9,6 +9,7 @@ import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { getLoonPort, recordImage, IMG_STORE_DIR } from "./lib/loon-manager.js";
+import { checkImageRateLimit, recordActivity, recordTraffic } from "./lib/activity.js";
 
 const app: Express = express();
 
@@ -143,6 +144,7 @@ async function fetchAndStoreStreamingCover(cdnUrl: string): Promise<void> {
       filename: cdnUrl.split("/").pop()?.split("?")[0] ?? "streaming-cover",
       sizeBytes: buffer.length,
     });
+    recordActivity("image", "Streaming cover art received", "Fetched cover art from the music CDN");
     logger.info({ cdnUrl }, "Stored streaming cover art from CDN");
   } catch (e) {
     logger.warn({ err: e, cdnUrl }, "Failed to fetch streaming cover art from CDN");
@@ -208,6 +210,7 @@ const loonProxy = createProxyMiddleware({
             filename: originalFilename,
             sizeBytes: buffer.length,
           });
+          recordActivity("image", "Cover art received", originalFilename);
         } else if (isText) {
           // Loon sends CDN URLs as text/plain for streaming songs —
           // fetch and store the actual image in the background
@@ -217,6 +220,7 @@ const loonProxy = createProxyMiddleware({
           }
         }
 
+        (res as Response).setHeader("content-length", buffer.length);
         (res as Response).end(buffer);
       } else {
         proxyRes.pipe(res as Response);
@@ -234,6 +238,22 @@ const loonProxy = createProxyMiddleware({
 });
 
 app.use("/loon-img", (req: Request, res: Response, next: NextFunction) => {
+  const forwardedFor = req.header("x-forwarded-for")?.split(",")[0]?.trim();
+  const clientKey = forwardedFor || req.socket.remoteAddress || "unknown";
+  const rate = checkImageRateLimit(clientKey);
+  res.setHeader("X-RateLimit-Limit", rate.limit);
+  res.setHeader("X-RateLimit-Remaining", rate.remaining);
+  if (!rate.allowed) {
+    res.setHeader("Retry-After", rate.retryAfterSeconds);
+    res.status(429).json({ error: "Too many image requests", retryAfterSeconds: rate.retryAfterSeconds });
+    return;
+  }
+
+  res.once("finish", () => {
+    const contentType = String(res.getHeader("content-type") ?? "");
+    const contentLength = Number(res.getHeader("content-length") ?? 0);
+    recordTraffic(contentLength, contentType.startsWith("image/"));
+  });
   loonProxy(req, res, next);
 });
 

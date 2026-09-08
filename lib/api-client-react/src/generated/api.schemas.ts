@@ -55,6 +55,25 @@ export interface LoonLogs {
   lines: string[];
 }
 
+export type ActivityEventType = typeof ActivityEventType[keyof typeof ActivityEventType];
+
+
+export const ActivityEventType = {
+  server: 'server',
+  client: 'client',
+  image: 'image',
+  config: 'config',
+  security: 'security',
+} as const;
+
+export interface ActivityEvent {
+  id: string;
+  type: ActivityEventType;
+  message: string;
+  detail?: string;
+  createdAt: string;
+}
+
 export interface LoonMetrics {
   cpuUsagePercent: number;
   memUsedBytes: number;
@@ -64,5 +83,13 @@ export interface LoonMetrics {
   imageStorageBytes: number;
   imageCount: number;
   nodeUptimeSeconds: number;
+  trafficRequests: number;
+  trafficBytes: number;
+  trafficImages: number;
+  rateLimitedRequests: number;
+  currentWindowRequests: number;
+  rateLimitPerMinute: number;
+  /** @nullable */
+  lastTrafficAt: string | null;
 }
 
