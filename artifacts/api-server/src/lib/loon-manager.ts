@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { logger } from "./logger.js";
+import { recordActivity } from "./activity.js";
 import { db, imagesTable } from "@workspace/db";
 import { desc, sql, inArray } from "drizzle-orm";
 
@@ -355,6 +356,7 @@ export async function startLoon(): Promise<void> {
   });
 
   await new Promise<void>((resolve) => setTimeout(resolve, 500));
+  recordActivity("server", "Loon proxy started", `Port ${LOON_INTERNAL_PORT}`);
   logger.info({ port: LOON_INTERNAL_PORT }, "Loon server started");
 }
 
@@ -367,12 +369,14 @@ export async function stopLoon(): Promise<void> {
   });
   loonProcess = null;
   startedAt = null;
+  recordActivity("server", "Loon proxy stopped");
 }
 
 export async function restartLoonIfRunning(): Promise<boolean> {
   if (!isRunning()) return false;
   logger.info("Config changed — restarting loon to apply new settings");
   appendLog("[config changed — restarting loon...]");
+  recordActivity("config", "Proxy configuration changed");
   await stopLoon();
   await startLoon();
   return true;

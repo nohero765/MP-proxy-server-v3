@@ -3,6 +3,7 @@ import type { Socket } from "net";
 import app, { wsProxy } from "./app";
 import { logger } from "./lib/logger";
 import { startLoon, incrementConnectedClients, decrementConnectedClients } from "./lib/loon-manager";
+import { recordActivity } from "./lib/activity";
 
 const rawPort = process.env["PORT"];
 
@@ -23,7 +24,9 @@ const server = http.createServer(app);
 server.on("upgrade", (req, socket, head) => {
   if (req.url?.startsWith("/ws")) {
     incrementConnectedClients();
+    recordActivity("client", "Music Presence client connected");
     socket.on("close", () => decrementConnectedClients());
+    socket.on("close", () => recordActivity("client", "Music Presence client disconnected"));
   }
   wsProxy.upgrade(req, socket as Socket, head);
 });
@@ -34,6 +37,7 @@ server.listen(port, (err?: Error) => {
     process.exit(1);
   }
   logger.info({ port }, "Server listening");
+  recordActivity("server", "API server started", `Port ${port}`);
 
   // Auto-start loon proxy on boot
   startLoon()

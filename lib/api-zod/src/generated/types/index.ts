@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './activityEvent';
+export * from './activityEventType';
 export * from './clearResult';
 export * from './healthStatus';
 export * from './loonConfig';

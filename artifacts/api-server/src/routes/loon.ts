@@ -16,6 +16,7 @@ import {
   IMG_STORE_DIR,
 } from "../lib/loon-manager.js";
 import { measureCpuPercent, getMemoryStats, getDiskStats, getNodeUptime } from "../lib/metrics.js";
+import { getActivity, getTrafficMetrics, recordActivity } from "../lib/activity.js";
 
 const router = Router();
 
@@ -66,6 +67,7 @@ router.put("/loon/config", async (req, res) => {
     ...(maxStoredImages !== undefined && { maxStoredImages: Number(maxStoredImages) }),
   });
   const restarted = await restartLoonIfRunning();
+  recordActivity("config", "Proxy settings saved", restarted ? "Loon restarted to apply changes" : "Will apply on next start");
   res.json({ ...updated, restarted });
 });
 
@@ -89,6 +91,10 @@ router.get("/loon/logs", (_req, res) => {
   res.json({ lines: getLogs() });
 });
 
+router.get("/loon/activity", (_req, res) => {
+  res.json(getActivity());
+});
+
 router.get("/loon/metrics", async (_req, res) => {
   const mem = getMemoryStats();
   const disk = getDiskStats();
@@ -105,6 +111,7 @@ router.get("/loon/metrics", async (_req, res) => {
     imageStorageBytes,
     imageCount,
     nodeUptimeSeconds: getNodeUptime(),
+    ...getTrafficMetrics(),
   });
 });
 

@@ -2,8 +2,9 @@ import {
   useGetLoonStatus, useStartLoon, useStopLoon,
   useGetLoonImages, useClearLoonImages,
   useGetLoonLogs, useGetLoonMetrics,
+  useGetLoonActivity,
   getGetLoonStatusQueryKey, getGetLoonImagesQueryKey,
-  getGetLoonLogsQueryKey, getGetLoonMetricsQueryKey,
+  getGetLoonLogsQueryKey, getGetLoonMetricsQueryKey, getGetLoonActivityQueryKey,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +16,7 @@ import { formatDistanceToNow } from "date-fns";
 import {
   Power, PowerOff, Copy, Trash2, Image as ImageIcon,
   Users, X, ExternalLink, Activity, ChevronDown, Cpu,
-  HardDrive, MemoryStick, Clock,
+  HardDrive, MemoryStick, Clock, History, Gauge, ShieldAlert,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
@@ -60,38 +61,80 @@ type ImageEntry = {
 
 type ImageDims = { w: number; h: number };
 
-/** Extract the most vibrant RGB color from an image via canvas sampling */
+/** Extract a weighted dominant accent from the cover art via canvas sampling. */
 function extractAccentColor(imgSrc: string): Promise<[number, number, number]> {
   return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    // Stored covers are same-origin and session-protected. Setting anonymous
+    // CORS on them would omit the session cookie and make the canvas unreadable.
+    try {
+      if (new URL(imgSrc, window.location.href).origin !== window.location.origin) {
+        img.crossOrigin = "anonymous";
+      }
+    } catch {
+      // Keep the browser's default behavior for malformed or relative URLs.
+    }
     img.onload = () => {
       try {
         const canvas = document.createElement("canvas");
-        const SIZE = 16;
+        const SIZE = 32;
         canvas.width = SIZE;
         canvas.height = SIZE;
         const ctx = canvas.getContext("2d");
         if (!ctx) { resolve([0, 204, 204]); return; }
         ctx.drawImage(img, 0, 0, SIZE, SIZE);
         const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
-        let bestSaturation = 0;
-        let bestR = 0, bestG = 204, bestB = 204;
+        const buckets = new Map<string, { r: number; g: number; b: number; weight: number; count: number; saturation: number; brightness: number }>();
         for (let i = 0; i < data.length; i += 4) {
+          const alpha = data[i + 3]!;
+          if (alpha < 180) continue;
           const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
           const max = Math.max(r, g, b);
           const min = Math.min(r, g, b);
-          // Skip near-black and near-white
-          if (max < 40 || min > 215) continue;
+          // Skip near-black, near-white, and nearly gray pixels.
+          if (max < 32 || (min > 220 && max > 235)) continue;
           const saturation = max === 0 ? 0 : (max - min) / max;
           const brightness = max / 255;
-          const score = saturation * 0.7 + brightness * 0.3;
-          if (score > bestSaturation) {
-            bestSaturation = score;
-            bestR = r; bestG = g; bestB = b;
+          if (saturation < 0.12 && (brightness < 0.22 || brightness > 0.82)) continue;
+
+          // Quantize nearby colors together, then favor clusters that are both
+          // present across the artwork and colorful enough to work as an accent.
+          const qr = Math.round(r / 32) * 32;
+          const qg = Math.round(g / 32) * 32;
+          const qb = Math.round(b / 32) * 32;
+          const key = `${qr},${qg},${qb}`;
+          const weight = 0.5 + saturation * 1.5;
+          const bucket = buckets.get(key) ?? { r: 0, g: 0, b: 0, weight: 0, count: 0, saturation: 0, brightness: 0 };
+          bucket.r += r * weight;
+          bucket.g += g * weight;
+          bucket.b += b * weight;
+          bucket.weight += weight;
+          bucket.count++;
+          bucket.saturation += saturation;
+          bucket.brightness += brightness;
+          buckets.set(key, bucket);
+        }
+
+        let best: { r: number; g: number; b: number; score: number } | null = null;
+        for (const bucket of buckets.values()) {
+          const averageSaturation = bucket.saturation / bucket.count;
+          const averageBrightness = bucket.brightness / bucket.count;
+          const score = bucket.count * (0.45 + averageSaturation) * (0.55 + averageBrightness * 0.45);
+          if (!best || score > best.score) {
+            best = {
+              r: bucket.r / bucket.weight,
+              g: bucket.g / bucket.weight,
+              b: bucket.b / bucket.weight,
+              score,
+            };
           }
         }
-        resolve([bestR, bestG, bestB]);
+
+        if (!best) {
+          resolve([0, 204, 204]);
+          return;
+        }
+        resolve([Math.round(best.r), Math.round(best.g), Math.round(best.b)]);
       } catch {
         resolve([0, 204, 204]);
       }
@@ -248,6 +291,9 @@ export default function Dashboard() {
   const { data: metrics } = useGetLoonMetrics({
     query: { queryKey: getGetLoonMetricsQueryKey(), refetchInterval: 2000, refetchIntervalInBackground: true }
   });
+  const { data: activity } = useGetLoonActivity({
+    query: { queryKey: getGetLoonActivityQueryKey(), refetchInterval: 2000, refetchIntervalInBackground: true }
+  });
 
   const startMutation = useStartLoon();
   const stopMutation = useStopLoon();
@@ -346,6 +392,7 @@ export default function Dashboard() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetLoonImagesQueryKey() });
         setImageDims(new Map());
+        setBrokenImages(new Set());
         setAccentRgb([0, 204, 204]);
         lastAccentUrl.current = "";
         document.documentElement.style.setProperty("--accent-rgb", "0, 204, 204");
@@ -491,6 +538,93 @@ export default function Dashboard() {
                   <div className="text-muted-foreground/40 italic">No recent logs...</div>
                 )}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Activity and traffic */}
+      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <Card className="glass-card border-0 shadow-lg">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <History className="w-4 h-4" style={{ color: `rgb(${accentCss})` }} />
+              Activity Timeline
+              <Badge variant="secondary" className="ml-auto text-[10px] font-mono bg-white/[0.06] border-0">
+                LIVE
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {activity && activity.length > 0 ? (
+              <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
+                {activity.slice(0, 12).map((event) => (
+                  <div key={event.id} className="flex items-start gap-3 rounded-lg px-2.5 py-2 hover:bg-white/[0.04] transition-colors">
+                    <span
+                      className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ background: `rgb(${accentCss})`, boxShadow: `0 0 8px rgba(${accentCss}, 0.55)` }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-xs text-foreground/90">{event.message}</p>
+                        <span className="text-[10px] text-muted-foreground/60 font-mono whitespace-nowrap">
+                          {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                      {event.detail && (
+                        <p className="text-[10px] text-muted-foreground/60 font-mono truncate mt-0.5">{event.detail}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-40 flex items-center justify-center text-sm text-muted-foreground/50 italic">
+                No activity recorded yet
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0 shadow-lg">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <Gauge className="w-4 h-4" style={{ color: `rgb(${accentCss})` }} />
+              Traffic &amp; Rate Limit
+              <span className="ml-auto text-[10px] font-mono text-muted-foreground/60">SESSION</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 grid grid-cols-2 gap-3">
+            <Stat label="Requests served" value={`${metrics?.trafficRequests ?? 0}`} />
+            <Stat label="Cover requests" value={`${metrics?.trafficImages ?? 0}`} />
+            <Stat label="Data transferred" value={formatBytes(metrics?.trafficBytes)} />
+            <Stat label="Blocked requests" value={`${metrics?.rateLimitedRequests ?? 0}`} />
+            <div className="col-span-2 bg-white/[0.04] rounded-lg p-2.5 space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5" /> Current image rate
+                </p>
+                <p className="font-mono text-sm font-medium">
+                  {metrics?.currentWindowRequests ?? 0} / {metrics?.rateLimitPerMinute ?? 180} per min
+                </p>
+              </div>
+              <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, ((metrics?.currentWindowRequests ?? 0) / (metrics?.rateLimitPerMinute ?? 180)) * 100)}%`,
+                    background: `rgb(${accentCss})`,
+                  }}
+                />
+              </div>
+            </div>
+            <div className="col-span-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground/60">
+              <span>Last request</span>
+              <span>
+                {metrics?.lastTrafficAt
+                  ? formatDistanceToNow(new Date(metrics.lastTrafficAt), { addSuffix: true })
+                  : "No requests yet"}
+              </span>
             </div>
           </CardContent>
         </Card>
