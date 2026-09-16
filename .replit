@@ -4,9 +4,6 @@ modules = ["nodejs-24", "go-1.25", "postgresql-16"]
 router = "application"
 deploymentTarget = "cloudrun"
 
-[deployment.postBuild]
-args = ["pnpm", "store", "prune"]
-env = { "CI" = "true" }
 
 [workflows]
 runButton = "Project"

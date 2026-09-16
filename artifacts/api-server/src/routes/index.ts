@@ -8,9 +8,11 @@ const router: IRouter = Router();
 // Public: login / logout / status
 router.use(authRouter);
 
+// Public health endpoint: the publishing platform probes this without a session.
+router.use(healthRouter);
+
 // Everything below requires a valid session
 router.use(requireAuth);
-router.use(healthRouter);
 router.use(loonRouter);
 
 export default router;
